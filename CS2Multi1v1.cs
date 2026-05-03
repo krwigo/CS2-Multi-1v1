@@ -351,6 +351,7 @@ public class CS2Multi1v1 : BasePlugin
     {
         if (Server.MapName == "aim_redline_fp" && !_aimMapLoaded)
         {
+            CullSpawnsForAimRedlineFp();
             List<Tuple<SpawnPoint, SpawnPoint>> arenasSpawns = getArenasSpawns();
             _rankedArenas.Clear();
 
@@ -363,6 +364,58 @@ public class CS2Multi1v1 : BasePlugin
             }
             _aimMapLoaded = true;
         }
+    }
+
+    private void CullSpawnsForAimRedlineFp()
+    {
+        var ctSpawns = Utilities.FindAllEntitiesByDesignerName<CInfoPlayerCounterterrorist>("info_player_counterterrorist").ToList();
+        var tSpawns = Utilities.FindAllEntitiesByDesignerName<CInfoPlayerTerrorist>("info_player_terrorist").ToList();
+
+        const float sameHeightTolerance = 8.0f;
+
+        foreach (var ctSpawn in ctSpawns)
+        {
+            var ctOrigin = ctSpawn.AbsOrigin;
+            if (ctOrigin == null)
+            {
+                continue;
+            }
+
+            var matchingTSpawn = tSpawns.FirstOrDefault(tSpawn =>
+            {
+                var tOrigin = tSpawn.AbsOrigin;
+                return tOrigin != null && Math.Abs(tOrigin.Z - ctOrigin.Z) <= sameHeightTolerance;
+            });
+
+            if (matchingTSpawn == null)
+            {
+                continue;
+            }
+
+            foreach (var otherCtSpawn in ctSpawns.Where(spawn => spawn != ctSpawn))
+            {
+                if (otherCtSpawn.IsValid)
+                {
+                    otherCtSpawn.Remove();
+                }
+            }
+
+            foreach (var otherTSpawn in tSpawns.Where(spawn => spawn != matchingTSpawn))
+            {
+                if (otherTSpawn.IsValid)
+                {
+                    otherTSpawn.Remove();
+                }
+            }
+
+            _logger.LogInformation(
+                "aim_redline_fp spawn cull kept CT spawn at {CtOrigin} and T spawn at {TOrigin}.",
+                ctOrigin,
+                matchingTSpawn.AbsOrigin);
+            return;
+        }
+
+        _logger.LogWarning("aim_redline_fp spawn cull did not find a CT/T spawn pair at matching height.");
     }
 
     private List<Tuple<SpawnPoint, SpawnPoint>> getArenasSpawns()
